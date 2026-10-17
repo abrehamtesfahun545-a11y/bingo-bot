@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="am"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ቢንጎ</title>
+<style>
+:root{--bg:#1c1f3a;--paper:#fff6e0;--ink:#1c1f3a;--hit:#e8505b;--gold:#f5b942;--dim:#9a9fc4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--paper);font:16px/1.4 system-ui,"Noto Sans Ethiopic",Nyala,sans-serif;min-height:100vh;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:12px}
+main{width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px}
+#top{display:flex;align-items:center;gap:14px}
+#ball{width:92px;height:92px;flex:none;border-radius:50%;background:var(--gold);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+#ball small{font-size:15px;font-weight:700}#ball b{font-size:40px}
+#ball.pop{animation:pop .35s}@keyframes pop{50%{transform:scale(1.12)}}
+#info{min-width:0}#msg{font-weight:600}#hist{color:var(--dim);font-size:14px;word-spacing:.4em;min-height:1.4em}
+#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.h{text-align:center;font-weight:800;color:var(--gold);font-size:20px}
+.c{aspect-ratio:1;border:0;border-radius:10px;background:var(--paper);color:var(--ink);font:700 20px inherit;font-family:inherit;padding:0}
+.c.k{outline:3px solid var(--gold);outline-offset:-3px}
+.c.m{background:var(--hit);color:#fff;outline:0}.c.f{background:var(--gold)}
+.c.no{animation:no .25s}@keyframes no{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+button.a{width:100%;border:0;border-radius:12px;padding:15px;font:800 20px inherit;font-family:inherit;background:var(--hit);color:#fff}
+button.a:disabled{background:#3a3e66;color:var(--dim)}button.s{background:transparent;color:var(--paper);border:1px solid var(--dim);font-size:15px;padding:10px;font-weight:500}
+#share{display:flex;gap:8px}#share a{flex:1;text-align:center;padding:10px;border:1px solid var(--dim);border-radius:10px;color:var(--paper);text-decoration:none;font-size:14px}
+#out{text-align:center;padding:30px 10px}#out a{color:var(--gold)}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body>
+<main id="out" hidden><h2>በቴሌግራም ይክፈቱ</h2><p>ይህ ጨዋታ በቴሌግራም ቦት በኩል ብቻ ይጫወታል።</p><p><a href="https://t.me/__BOT__">t.me/__BOT__</a></p></main>
+<main id="app">
+ <div id="top"><div id="ball"><b>–</b></div><div id="info"><div id="msg">በመገናኘት ላይ…</div><div id="hist"></div></div></div>
+ <div id="grid"></div>
+ <button class="a" id="bingo" disabled>BINGO!</button>
+ <button class="a s" id="re" hidden>ካርድ ቀይር</button>
+ <div id="share"><a id="wa" target="_blank" rel="noopener">WhatsApp ላይ ጋብዝ</a><a id="tl" target="_blank" rel="noopener">Telegram ላይ ጋብዝ</a></div>
+</main>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+const tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand();}
+const $=s=>document.querySelector(s),L=n=>'BINGO'[Math.floor((n-1)/15)];
+const initData=(tg&&tg.initData)||new URLSearchParams(location.hash.slice(1)).get('tgWebAppData')||'';
+const link='https://t.me/__BOT__',txt='🎱 ቢንጎ እንጫወት! ';
+$('#wa').href='https://wa.me/?text='+encodeURIComponent(txt+link);
+$('#tl').href='https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent(txt);
+let ws,S={st:'idle',called:[],card:null,o:0,w:null},marks=new Set(),cardKey='',retry=0;
+function conn(){
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws.onopen=()=>{retry=0;ws.send(JSON.stringify({t:'a',d:initData}))};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);
+    if(m.t==='x0'){retry=99;$('#app').hidden=true;$('#out').hidden=false}
+    else if(m.t==='s'){S=m;const k=JSON.stringify(m.card);if(k!==cardKey){cardKey=k;marks=new Set();draw()}render()}
+    else if(m.t==='c'){S.called.push(m.n);S.o=m.o;buzz();render(true)}
+    else if(m.t==='g'){S.st='running';render()}
+    else if(m.t==='e2'){S.st='ended';S.w=m.w;render()}
+    else if(m.t==='x'){buzz();$('#bingo').classList.add('no');setTimeout(()=>$('#bingo').classList.remove('no'),300);$('#msg').textContent='ገና BINGO አልሆነም'}};
+  ws.onclose=()=>{if(retry<99)setTimeout(conn,Math.min(10000,1000*++retry))};
+}
+const buzz=()=>{try{tg&&tg.HapticFeedback?tg.HapticFeedback.impactOccurred('light'):navigator.vibrate&&navigator.vibrate(30)}catch(e){}};
+function draw(){
+  const g=$('#grid');g.textContent='';
+  [...'BINGO'].forEach(l=>{const d=document.createElement('div');d.className='h';d.textContent=l;g.append(d)});
+  if(!S.card)return;
+  for(let r=0;r<5;r++)for(let k=0;k<5;k++){const n=S.card[k][r],b=document.createElement('button');
+    b.className='c'+(n?'':' f m');b.dataset.n=n;b.textContent=n||'★';
+    b.onclick=()=>{if(!n)return;if(S.called.includes(n)){marks.has(n)?marks.delete(n):marks.add(n);buzz();render()}else{b.classList.add('no');setTimeout(()=>b.classList.remove('no'),300)}};g.append(b)}
+}
+function render(pop){
+  const c=S.called,last=c[c.length-1];
+  $('#ball').innerHTML=last?'<small>'+L(last)+'</small><b>'+last+'</b>':'<b>–</b>';
+  if(pop){$('#ball').classList.remove('pop');void $('#ball').offsetWidth;$('#ball').classList.add('pop')}
+  $('#hist').textContent=c.slice(-8,-1).reverse().map(n=>L(n)+n).join(' ');
+  $('#msg').textContent={idle:'ጨዋታ እስኪከፈት ይጠብቁ',lobby:'ጨዋታ ሊጀምር ነው · '+S.o+' ተጫዋቾች',running:c.length+' ቁጥር ተጠርቷል · '+S.o+' ተጫዋቾች',ended:S.w?'🎉 አሸናፊ፦ '+S.w:'ጨዋታ ተጠናቋል'}[S.st];
+  $('#re').hidden=!(S.st==='lobby'&&S.card);
+  $('#bingo').disabled=!(S.st==='running'&&S.card);
+  document.querySelectorAll('.c').forEach(b=>{const n=+b.dataset.n;if(!n)return;b.classList.toggle('m',marks.has(n));b.classList.toggle('k',c.includes(n)&&!marks.has(n))});
+}
+$('#bingo').onclick=()=>ws.send('{"t":"b"}');
+$('#re').onclick=()=>ws.send('{"t":"r"}');
+conn();draw();
+</script></body></html>
